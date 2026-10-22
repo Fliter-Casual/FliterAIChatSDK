@@ -1,5 +1,5 @@
-#include "DeepSeekProvider.h"
-#include "myLog.h"
+#include "../include/DeepSeekProvider.h"
+#include "../include/util/myLog.h"
 #include <jsoncpp/json/json.h>
 #include <httplib.h>
 
@@ -33,7 +33,7 @@ namespace ai_chat_sdk
         }
 
         _isAvailable = true;
-        INFO("DeepSeekProvider initModel success, apiKey : %s, endpoint : %s", _apiKey.c_str(), _endPoint.c_str());
+        INFO("DeepSeekProvider initModel success, apiKey : {}, endpoint : {}", _apiKey, _endPoint);
         return true;
     }
 

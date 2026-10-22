@@ -1,15 +1,18 @@
 #include "../../include/util/myLog.h"
-
+#include <memory>
+#include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/async.h>
 
 namespace fliter
 {
-    static std::shared_ptr<spdlog::logger> _logger = nullptr;
-    static std::mutex _mutex;
+    std::shared_ptr<spdlog::logger> Logger::_logger = nullptr;
+    std::mutex Logger::_mutex;
 
     Logger::Logger()
     {}
 
-    void initLogger(const std::string &loggerName, const std::string &loggerFile, spdlog::level::level_enum logLevel)
+    void Logger::initLogger(const std::string &loggerName, const std::string &loggerFile, spdlog::level::level_enum logLevel)
     {
         if (nullptr == _logger)
         {
@@ -29,7 +32,7 @@ namespace fliter
                 else
                 {
                     // 创建⼀个输出到指定⽂件的异步⽇志器
-                    _logger = spdlog::basic_logger_mt<spdlog::async_logger>(loggerName, loggerFile);
+                    _logger = spdlog::basic_logger_mt<spdlog::async_factory>(loggerName, loggerFile);
                 }
             }
 
