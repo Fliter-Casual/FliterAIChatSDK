@@ -156,8 +156,68 @@ namespace ai_chat_sdk
     // 发送消息给模型 - 流式响应(增量返回)
     std::string DeepSeekProvider::sendMessageStream(const std::vector<Message> &messages,
                                                     const std::map<std::string, std::string> &request_param,
-                                                    std::function<void(const std::string &, bool)> callback)
+                                                    std::function<void(const std::string &, bool)> callback) // callback这个参数用来处理解析出来的数据
     {
+        INFO("DeepSeekProvider sendMessageStream");
+        if(isAvailable())
+        {
+            ERR("DeepSeekProvider is not available");
+            return "";
+        }
+
+        // 构造请求参数
+        double temperature = 0.7;
+        int max_tokens = 2048;
+        if(request_param.find("temperature") != request_param.end())
+        { 
+            temperature = std::stof(request_param.at("temperature")); 
+        }
+        if(request_param.find("max_tokens") != request_param.end())
+        { 
+            max_tokens = std::stoi(request_param.at("max_tokens"));
+        }
+
+        // 构建历史消息(包含当前对话)
+        Json::Value messages_array(Json::arrayValue);
+        for(const auto& message : messages)
+        {
+            Json::Value msg;
+            msg["role"] = message._role;
+            msg["content"] = message._content;
+            messages_array.append(msg);
+        }
+
+        // 构建请求体
+        Json::Value request_body;
+        request_body["model"] = "deepseek-chat";
+        request_body["messages"] = messages_array; // 消息
+        request_body["temperature"] = temperature;
+        request_body["max_tokens"] = max_tokens;
+        request_body["stream"] = true; // 开启流式响应
+
+        // 序列化
+        Json::StreamWriterBuilder writer;
+        std::string json_string = Json::writeString(writer, request_body);
+        DBG("DeepSeekProvider: Send stream request to deepseek Server,request_body: {}", json_string);
+
+        //创建HTTP Client
+        httplib::Client client(_endPoint);
+        client.set_connection_timeout(30,0); // 30秒超时
+        client.set_read_timeout(300, 0);//流式响应需要更⻓的时间
+
+        //设置请求头
+        httplib::Headers headers = {
+            {"Authorization", "Bearer " + _apiKey},
+            {"Content-Type", "application/json"},
+            {"Accept", "text/event-stream"}
+        };
+
+        //流式处理变量
+        
+
+
+
+
         return "";
     }
 
