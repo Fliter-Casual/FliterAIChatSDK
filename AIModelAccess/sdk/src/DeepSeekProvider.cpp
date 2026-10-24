@@ -159,7 +159,7 @@ namespace ai_chat_sdk
                                                     std::function<void(const std::string &, bool)> callback) // callback这个参数用来处理解析出来的数据
     {
         INFO("DeepSeekProvider sendMessageStream");
-        if(isAvailable())
+        if(!isAvailable())
         {
             ERR("DeepSeekProvider is not available");
             return "";
@@ -211,14 +211,125 @@ namespace ai_chat_sdk
             {"Content-Type", "application/json"},
             {"Accept", "text/event-stream"}
         };
+        // 设置完请求头过后还不能发送POST请求
+        // 要先设置响应处理器和内容接收处理器
 
-        //流式处理变量
-        
+        // 流式处理变量
+        std::string buffer;       //接收流式响应的数据块
+        bool gotError = false;    //响应是否成功
+        std::string errorMsg;     //错误描述符
+        int statusCode = 0;       //状态码
+        bool streamFinish = false;//标记流式返回数据是否结束
+        std::string fullResponse; //累积完整的响应(拼接上流式返回的数据)
 
+        //创建请求对象
+        httplib::Request req;
+        req.method = "POST";
+        req.path = "/v1/chat/completions";
+        req.headers = headers;
+        req.body = json_string;
 
+        // 设置响应头处理器,检测send返回值，应答过后的响应
+        req.response_handler = [&](const httplib::Response& response){
+            statusCode = response.status;
+            if(200 != statusCode){
+                gotError = true;
+                errorMsg = "HTTP Error:" + std::to_string(statusCode);
+                return false; //终止请求
+            }
 
+            return true;      // 成功就继续接受数据
+        };
 
-        return "";
+        // 设置body数据接收处理器 -- 解析流式响应的每个块是数据
+        req.content_receiver = [&](const char* data, size_t len, uint64_t offset,uint64_t totalLength){
+            // 验证http请求头是否出错
+            if(gotError)
+            {
+                return false;
+            }
+
+            // 追加新数据到缓冲区
+            buffer.append(data, len);
+            std::cout<<"buffer: "<<buffer<<std::endl;
+
+            // 处理所有的流式响应数据块，数据块之间以\n\n分隔
+            size_t pos = 0;
+            while((pos = buffer.find("\n\n")) != std::string::npos){ // 单个数据块处理结束循环退出,等待模型返回下一个数据块
+                // 截取当前找到的数据块
+                std::string chunk = buffer.substr(0, pos);
+                buffer.erase(0, pos+2); //移除已经处理的数据块
+
+                // 解析该块响应数据中模型返回的有效数据
+                // 处理空行和注释,以:开头的是注释行
+                if(chunk.empty() || chunk[0] == ':'){
+                    continue;
+                }
+
+                // 获取模型返回的有效数据
+                if(chunk.compare(0,6,"data: ") == 0)
+                {
+                    std::string modelData = chunk.substr(6);
+
+                    // 处理结束标记
+                    if(modelData == "[DONE]")
+                    {
+                        callback("", true); // 数据流结束了，返回true
+                        streamFinish = true;
+                        return true;
+                    }
+
+                    // 反序列化
+                    Json::Value modelDataJson;
+                    Json::CharReaderBuilder reader;
+                    std::string errors;
+                    std::istringstream modelDataStream(modelData);
+                    if(Json::parseFromStream(reader,modelDataStream,&modelDataJson,&errors))
+                    {
+                        // 模型返回的json格式的数据现在就保存在modelDataJson对象当中
+                        if(modelDataJson.isMember("choices") &&
+                            modelDataJson["choices"].isArray() &&
+                            !modelDataJson["choices"].empty() &&
+                            modelDataJson["choices"][0].isMember("delta")&&
+                            modelDataJson["choices"][0]["delta"].isMember("content"))
+                            {
+                                std::string content = modelDataJson["choices"][0]["delta"]["content"].asString();
+                                // 把结果拼接到fullResponse
+                                fullResponse += content;
+
+                                // 将本次解析出的模型返回的有效数据传给调用sendMessageStream函数的用户使用--callback()
+                                callback(content,false); // 流式数据还没有完
+                            }
+                    }
+                    else // 反序列化解析失败
+                    {
+                        WARN("DeepSeek SSE JSON parse error : {}", errors);
+                    }
+
+                }
+                
+            }
+
+            return true; // 以上的操作都是在定义req请求对象：请求体，内容处理函数
+        };
+
+        // 给模型发送请求
+        httplib::Result result = client.send(req);
+        if(!result) // 有bool()重载
+        {
+            // 请求发送失败，出现网络问题，比如DNS解析失败，连接超时
+            ERR("Netword error {}",to_string(result.error()));
+            return "";
+        }
+
+        // 确保流式操作正常结束
+        if(!streamFinish)
+        {
+            WARN("strean ended without [DONE] marker");
+            callback("",true); // true表示结束
+        }
+
+        return fullResponse;
     }
 
 } // namespace ai_chat_sdk
