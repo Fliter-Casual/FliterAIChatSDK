@@ -52,7 +52,7 @@ namespace ai_chat_sdk
     // 获取模型的描述信息
     std::string DeepSeekProvider::getModelDesc() const
     {
-        return "⼀款实⽤性强、中⽂优化的通⽤对话助⼿，适合⽇常问答与创作";
+        return "一款好用、对中文支持好的通用对话助手，日常问答和写作都能胜任。";
     }
 
     // 发送消息给模型 - 全量返回
