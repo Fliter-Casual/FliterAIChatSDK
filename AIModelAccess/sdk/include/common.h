@@ -9,7 +9,7 @@ namespace ai_chat_sdk
     // 消息结构
     struct Message
     {
-        std::string _emssageId; // 消息ID
+        std::string _messageId; // 消息ID
         std::string _role;      // 角色,如user、assistant等
         std::string _content;   // 消息内容
         std::string _timestamp; // 消息发送的时间戳
@@ -58,8 +58,8 @@ namespace ai_chat_sdk
         std::string _sessionId;         // 会话ID
         std::string _modeName;         // 模型名称
         std::vector<Message> _messages;  // 消息列表
-        std::time_t _createdAt;         // 会话创建时间戳
-        std::time_t _updatedAt;         // 会话最后更新时间戳
+        std::time_t _createdAt;         // 会话创建时间戳,创建的时候赋值
+        std::time_t _updatedAt;         // 会话最后更新时间戳，添加会话的时候更新
         Session(const std::string &modelName = "")
             : _modeName(modelName)
         {}
